@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เช็คอิน เพชรธงชัย</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;background:#f0f4f8;display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:20px}
+.card{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.logo{text-align:center;margin-bottom:16px}
+.logo h1{color:#e53935;font-size:20px}
+.logo p{color:#666;font-size:13px}
+.progress{display:flex;gap:4px;margin-bottom:16px}
+.bar{flex:1;height:6px;border-radius:3px;background:#e0e0e0;transition:all .3s}
+.bar.active{background:#ff9800}
+.bar.done{background:#4caf50}
+#statusBox{padding:14px;border-radius:10px;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-all;background:#fff8e1;border:1px solid #ffe082;color:#5d4037}
+#statusBox.error{background:#ffebee;border-color:#ef9a9a;color:#c62828}
+#statusBox.success{background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32}
+.section{margin-top:16px}
+label{font-size:14px;color:#555;display:block;margin-bottom:4px}
+input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:'Sarabun',sans-serif}
+.btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:16px;font-family:'Sarabun',sans-serif;cursor:pointer;margin-top:10px;font-weight:bold}
+.btn-green{background:#4caf50;color:#fff}
+.btn-orange{background:#ff9800;color:#fff}
+.btn-red{background:#f44336;color:#fff}
+.btn-gray{background:#9e9e9e;color:#fff}
+.btn:disabled{background:#ccc;cursor:not-allowed}
+#screenRegister,#screenCheckin,#screenSuccess{display:none}
+.photo-preview{width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-top:8px;display:none}
+#debugBox{margin-top:12px;font-size:11px;color:#999;background:#f5f5f5;padding:8px;border-radius:6px;display:none;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>⏰ เช็คอินเพชรธงชัย</h1>
+    <p>บริษัท เพชรธงชัย เทรดดิ้ง จำกัด</p>
+  </div>
+  <div class="progress">
+    <div class="bar" id="b1"></div>
+    <div class="bar" id="b2"></div>
+    <div class="bar" id="b3"></div>
+    <div class="bar" id="b4"></div>
+  </div>
+  <div id="statusBox">⏳ กำลังโหลด...</div>
+
+  <!-- หน้าลงทะเบียน -->
+  <div id="screenRegister">
+    <div class="section">
+      <label>ชื่อ-นามสกุล *</label>
+      <input id="regName" type="text" placeholder="เช่น สมชาย ใจดี">
+    </div>
+    <div class="section">
+      <label>แผนก *</label>
+      <select id="regDept">
+        <option value="">-- เลือกแผนก --</option>
+        <option>เซลล์</option>
+        <option>คลังสินค้า</option>
+        <option>ขนส่ง</option>
+        <option>บัญชี</option>
+        <option>แอดมิน</option>
+        <option>ฝ่ายบุคคล</option>
+      </select>
+    </div>
+    <div class="section">
+      <label>ตำแหน่ง</label>
+      <input id="regPosition" type="text" placeholder="เช่น พนักงานขาย">
+    </div>
+    <div class="section">
+      <label>เบอร์โทร</label>
+      <input id="regPhone" type="tel" placeholder="เช่น 0812345678">
+    </div>
+    <button class="btn btn-green" onclick="submitRegister()">✅ ลงทะเบียน</button>
+  </div>
+
+  <!-- หน้าเช็คอิน -->
+  <div id="screenCheckin">
+    <div class="section" id="empInfo" style="background:#e3f2fd;padding:12px;border-radius:8px;font-size:14px"></div>
+    <button class="btn btn-orange" id="gpsBtn" onclick="checkGPS()" style="margin-top:12px">📍 ตรวจสอบตำแหน่ง GPS</button>
+    <div class="section" style="margin-top:12px">
+      <label>📷 ถ่ายรูป (ต้องถ่ายจากกล้องเท่านั้น)</label>
+      <input type="file" accept="image/*" capture="environment" id="photoInput" onchange="handlePhoto(this)" style="margin-top:6px">
+      <img id="photoPreview" class="photo-preview">
+    </div>
+    <button class="btn btn-green" id="submitBtn" onclick="submitCheckin()" disabled>✅ ยืนยันเช็คอิน</button>
+  </div>
+
+  <!-- หน้าสำเร็จ -->
+  <div id="screenSuccess">
+    <div style="text-align:center;padding:20px">
+      <div style="font-size:60px">✅</div>
+      <h2 style="color:#2e7d32;margin-top:8px">เช็คอินสำเร็จ!</h2>
+      <p id="successMsg" style="margin-top:8px;color:#555;font-size:14px"></p>
+    </div>
+  </div>
+
+  <button class="btn btn-gray" id="retryBtn" onclick="init()" style="display:none;margin-top:10px">🔄 ลองใหม่</button>
+  <button class="btn" onclick="toggleDebug()" style="margin-top:8px;background:#eeeeee;color:#666;font-size:12px">🔧 Debug</button>
+  <div id="debugBox"></div>
+</div>
+
+<script>
+// ========== ตั้งค่า — แก้ไขตรงนี้เท่านั้น ==========
+var LIFF_ID = '2010044858-D1EyF8AC';
+var API_URL = 'https://script.google.com/macros/s/AKfycbwUpZNWVC0DWVeZ5DNPso-mqNVXwHsdBoEdIL8IamCiXwk_jWYAzTRY7no952Draj6RYg/exec';  // ← แก้ตรงนี้!
+// ====================================================
+
+var userId = '', userName = '', locOk = false, photoB64 = '';
+var debugData = {};
+
+function setStatus(msg, type){
+  var el = document.getElementById('statusBox');
+  el.textContent = msg;
+  el.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+  el.style.display = 'block';
+}
+function setBar(n, state){
+  for(var i=1;i<=4;i++){
+    var el = document.getElementById('b'+i);
+    if(i < n) el.className='bar done';
+    else if(i === n) el.className='bar '+state;
+    else el.className='bar';
+  }
+}
+function showRetry(){ document.getElementById('retryBtn').style.display='block'; }
+function hideRetry(){ document.getElementById('retryBtn').style.display='none'; }
+function showScreen(id){
+  ['screenRegister','screenCheckin','screenSuccess'].forEach(function(s){
+    document.getElementById(s).style.display = s===id ? 'block' : 'none';
+  });
+}
+function toggleDebug(){
+  var el = document.getElementById('debugBox');
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+  el.textContent = JSON.stringify(debugData, null, 2);
+}
+
+async function callAPI(data){
+  var res = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    redirect: 'follow'
+  });
+  return res.json();
+}
+
+async function init(){
+  hideRetry();
+  showScreen('');
+  try {
+    setStatus('⏳ กำลังเชื่อมต่อ LINE...', 'loading');
+    setBar(1, 'active');
+
+    if(typeof liff === 'undefined') throw new Error('LIFF SDK โหลดไม่ได้ — ตรวจสอบ Internet');
+
+    // Init LIFF พร้อม timeout
+    try {
+      await Promise.race([
+        liff.init({ liffId: LIFF_ID }),
+        new Promise(function(_, reject){
+          setTimeout(function(){
+            reject({ code: 'TIMEOUT', message: 'liff.init ค้างเกิน 10 วินาที\nURL ปัจจุบัน: ' + window.location.href.substring(0,100) });
+          }, 10000);
+        })
+      ]);
+    } catch(liffErr){
+      var ec = liffErr.code || 'NO_CODE';
+      var em = liffErr.message || String(liffErr);
+      debugData.liffError = { code: ec, message: em, liffId: LIFF_ID, url: window.location.href };
+      setStatus('❌ LIFF Error: ' + ec + '\n' + em, 'error');
+      showRetry(); return;
+    }
+
+    if(!liff.isLoggedIn()){ liff.login(); return; }
+    setBar(1, 'done');
+
+    // ดึงข้อมูล Profile
+    setStatus('⏳ กำลังโหลดข้อมูล...', 'loading');
+    setBar(2, 'active');
+    var profile = await liff.getProfile();
+    userId   = profile.userId;
+    userName = profile.displayName;
+    debugData.profile = { userId: userId, name: userName };
+    setBar(2, 'done');
+
+    // ตรวจสอบการลงทะเบียน
+    setStatus('⏳ กำลังตรวจสอบข้อมูลพนักงาน...', 'loading');
+    setBar(3, 'active');
+    var result = await callAPI({ action: 'getEmployee', userId: userId });
+    debugData.getEmployee = result;
+
+    if(result.found){
+      // พนักงานเดิม → ไปหน้าเช็คอิน
+      setBar(3, 'done');
+      setStatus('✅ ยินดีต้อนรับ ' + result.name, 'success');
+      document.getElementById('empInfo').innerHTML =
+        '<b>👤 ' + result.name + '</b><br>แผนก: ' + result.dept +
+        (result.position ? '<br>ตำแหน่ง: ' + result.position : '');
+      showScreen('screenCheckin');
+    } else {
+      // พนักงานใหม่ → ไปหน้าลงทะเบียน
+      setBar(3, 'done');
+      setStatus('📝 กรุณาลงทะเบียนพนักงานใหม่', '');
+      showScreen('screenRegister');
+    }
+
+  } catch(err){
+    debugData.error = String(err);
+    setStatus('❌ ' + (err.message || String(err)), 'error');
+    showRetry();
+  }
+}
+
+// ลงทะเบียน
+async function submitRegister(){
+  var name     = document.getElementById('regName').value.trim();
+  var dept     = document.getElementById('regDept').value;
+  var position = document.getElementById('regPosition').value.trim();
+  var phone    = document.getElementById('regPhone').value.trim();
+  if(!name){ alert('กรุณากรอกชื่อ-นามสกุล'); return; }
+  if(!dept){ alert('กรุณาเลือกแผนก'); return; }
+
+  setStatus('⏳ กำลังลงทะเบียน...', 'loading');
+  try {
+    var result = await callAPI({
+      action: 'register',
+      userId: userId, name: name,
+      dept: dept, position: position, phone: phone,
+      lineDisplayName: userName
+    });
+    if(result.success){
+      setStatus('✅ ลงทะเบียนสำเร็จ!', 'success');
+      setTimeout(init, 1500);
+    } else {
+      setStatus('❌ ลงทะเบียนไม่สำเร็จ: ' + (result.error || ''), 'error');
+    }
+  } catch(e){
+    setStatus('❌ ' + String(e), 'error');
+  }
+}
+
+// GPS
+function checkGPS(){
+  setStatus('⏳ กำลังหาตำแหน่ง GPS...', 'loading');
+  setBar(3, 'active');
+  document.getElementById('gpsBtn').disabled = true;
+
+  if(!navigator.geolocation){
+    setStatus('❌ เครื่องนี้ไม่รองรับ GPS', 'error');
+    document.getElementById('gpsBtn').disabled = false;
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    function(pos){
+      var lat = pos.coords.latitude;
+      var lng = pos.coords.longitude;
+      debugData.gps = { lat: lat, lng: lng, accuracy: pos.coords.accuracy };
+
+      // ตำแหน่งบริษัท (แก้ไขตามจริง)
+      var locations = [
+        { name: 'สำนักงานใหญ่', lat: 13.7563, lng: 100.5018 },
+        { name: 'คลังสินค้า',    lat: 13.7600, lng: 100.5100 }
+      ];
+      var minDist = 999999, nearest = '';
+      locations.forEach(function(loc){
+        var d = haversine(lat, lng, loc.lat, loc.lng);
+        if(d < minDist){ minDist = d; nearest = loc.name; }
+      });
+
+      setBar(3, 'done');
+      if(minDist <= 500){ // 500 เมตร (ปรับเป็น 10 เมตรเมื่อพร้อม)
+        locOk = true;
+        setStatus('✅ GPS OK — ' + nearest + '\n(ห่าง ' + Math.round(minDist) + ' ม.)', 'success');
+        document.getElementById('camBtn') && (document.getElementById('camBtn').disabled = false);
+      } else {
+        locOk = false;
+        setStatus('❌ อยู่นอกพื้นที่ — ห่างจาก ' + nearest + ' = ' + Math.round(minDist) + ' ม.', 'error');
+      }
+      document.getElementById('gpsBtn').disabled = false;
+    },
+    function(err){
+      setStatus('❌ GPS Error: ' + err.message, 'error');
+      document.getElementById('gpsBtn').disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+  );
+}
+
+function haversine(lat1,lng1,lat2,lng2){
+  var R=6371000, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180;
+  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ถ่ายรูป
+function handlePhoto(input){
+  if(!input.files||!input.files[0]) return;
+  var file = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var canvas = document.createElement('canvas');
+      var max = 800;
+      var scale = Math.min(max/img.width, max/img.height, 1);
+      canvas.width  = img.width  * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      photoB64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+      document.getElementById('photoPreview').src = canvas.toDataURL('image/jpeg', 0.75);
+      document.getElementById('photoPreview').style.display = 'block';
+      if(locOk) document.getElementById('submitBtn').disabled = false;
+      debugData.photo = 'ok (' + photoB64.length + ' chars)';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ยืนยันเช็คอิน
+async function submitCheckin(){
+  if(!locOk){ alert('กรุณาตรวจสอบ GPS ก่อน'); return; }
+  if(!photoB64){ alert('กรุณาถ่ายรูปก่อน'); return; }
+
+  document.getElementById('submitBtn').disabled = true;
+  setStatus('⏳ กำลังบันทึกข้อมูล...', 'loading');
+  setBar(4, 'active');
+
+  try {
+    var result = await callAPI({
+      action: 'saveCheckin',
+      userId: userId,
+      photoBase64: photoB64
+    });
+    if(result.success){
+      setBar(4, 'done');
+      document.getElementById('successMsg').textContent =
+        result.name + ' — ' + result.dept + '\n' + result.time;
+      showScreen('screenSuccess');
+      setStatus('', 'success');
+    } else {
+      setStatus('❌ บันทึกไม่สำเร็จ: ' + (result.error || ''), 'error');
+      document.getElementById('submitBtn').disabled = false;
+    }
+  } catch(e){
+    setStatus('❌ ' + String(e), 'error');
+    document.getElementById('submitBtn').disabled = false;
+  }
+}
+
+window.onerror = function(msg,src,line){
+  setStatus('❌ JS Error: ' + msg + '\nLine: ' + line, 'error');
+};
+
+init();
+</script>
+</body>
+</html>
