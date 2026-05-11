@@ -79,7 +79,18 @@ input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;fon
   <!-- หน้าเช็คอิน -->
   <div id="screenCheckin">
     <div class="section" id="empInfo" style="background:#e3f2fd;padding:12px;border-radius:8px;font-size:14px"></div>
-    <button class="btn btn-orange" id="gpsBtn" onclick="checkGPS()" style="margin-top:12px">📍 ตรวจสอบตำแหน่ง GPS</button>
+    
+    <!-- เลือกสถานที่ -->
+    <div class="section" style="margin-top:12px">
+      <label>📍 เลือกสถานที่เช็คอิน *</label>
+      <select id="locationSelect" style="margin-top:6px" onchange="onLocationChange()">
+        <option value="">-- กรุณาเลือกสถานที่ --</option>
+        <option value="0">🏢 สำนักงานใหญ่ / คลังสินค้า</option>
+        <option value="1">🏪 มินิออฟฟิศ ลาดพร้าว 114</option>
+      </select>
+    </div>
+    
+    <button class="btn btn-orange" id="gpsBtn" onclick="checkGPS()" style="margin-top:12px" disabled>📍 ตรวจสอบตำแหน่ง GPS</button>
     <div class="section" style="margin-top:12px">
       <label>📷 ถ่ายรูป (ต้องถ่ายจากกล้องเท่านั้น)</label>
       <input type="file" accept="image/*" capture="environment" id="photoInput" onchange="handlePhoto(this)" style="margin-top:6px">
@@ -244,7 +255,38 @@ async function submitRegister(){
 }
 
 // GPS
+// รายชื่อสถานที่ทั้งหมด
+var LOCATIONS = [
+  { name: 'สำนักงานใหญ่ / คลังสินค้า', lat: 13.7368098, lng: 100.8028095 },
+  { name: 'มินิออฟฟิศ ลาดพร้าว 114',   lat: 13.770801,  lng: 100.6220377 }
+];
+var GPS_RADIUS = 200; // เมตร (ปรับได้)
+var selectedLocation = null;
+var selectedLocationName = '';
+
+// เมื่อเลือกสถานที่
+function onLocationChange(){
+  var sel = document.getElementById('locationSelect').value;
+  var gpsBtn = document.getElementById('gpsBtn');
+  if(sel === ''){
+    gpsBtn.disabled = true;
+    selectedLocation = null;
+  } else {
+    selectedLocation = LOCATIONS[parseInt(sel)];
+    selectedLocationName = selectedLocation.name;
+    gpsBtn.disabled = false;
+    setStatus('📍 เลือก: ' + selectedLocation.name + '\nกด "ตรวจสอบตำแหน่ง GPS" ได้เลย', '');
+  }
+  locOk = false;
+  document.getElementById('submitBtn').disabled = true;
+}
+
+// ตรวจสอบ GPS
 function checkGPS(){
+  if(!selectedLocation){
+    alert('กรุณาเลือกสถานที่ก่อน');
+    return;
+  }
   setStatus('⏳ กำลังหาตำแหน่ง GPS...', 'loading');
   setBar(3, 'active');
   document.getElementById('gpsBtn').disabled = true;
@@ -254,39 +296,50 @@ function checkGPS(){
     document.getElementById('gpsBtn').disabled = false;
     return;
   }
+
   navigator.geolocation.getCurrentPosition(
     function(pos){
-      var lat = pos.coords.latitude;
-      var lng = pos.coords.longitude;
-      debugData.gps = { lat: lat, lng: lng, accuracy: pos.coords.accuracy };
+      var lat  = pos.coords.latitude;
+      var lng  = pos.coords.longitude;
+      var acc  = Math.round(pos.coords.accuracy);
+      var dist = Math.round(haversine(lat, lng, selectedLocation.lat, selectedLocation.lng));
 
-      // ตำแหน่งบริษัท (แก้ไขตามจริง)
-      var locations = [
-        { name: 'สำนักงานใหญ่', lat: 13.7563, lng: 100.5018 },
-        { name: 'คลังสินค้า',    lat: 13.7600, lng: 100.5100 }
-      ];
-      var minDist = 999999, nearest = '';
-      locations.forEach(function(loc){
-        var d = haversine(lat, lng, loc.lat, loc.lng);
-        if(d < minDist){ minDist = d; nearest = loc.name; }
-      });
-
+      debugData.gps = { lat: lat, lng: lng, accuracy: acc, distToTarget: dist };
       setBar(3, 'done');
-      if(minDist <= 500){ // 500 เมตร (ปรับเป็น 10 เมตรเมื่อพร้อม)
+
+      if(dist <= GPS_RADIUS){
         locOk = true;
-        setStatus('✅ GPS OK — ' + nearest + '\n(ห่าง ' + Math.round(minDist) + ' ม.)', 'success');
-        document.getElementById('camBtn') && (document.getElementById('camBtn').disabled = false);
+        setStatus(
+          '✅ GPS ผ่าน!\n' +
+          '📍 สถานที่: ' + selectedLocation.name + '\n' +
+          '📏 ระยะห่าง: ' + dist + ' ม. (ความแม่นยำ ±' + acc + ' ม.)',
+          'success'
+        );
       } else {
         locOk = false;
-        setStatus('❌ อยู่นอกพื้นที่ — ห่างจาก ' + nearest + ' = ' + Math.round(minDist) + ' ม.', 'error');
+        setStatus(
+          '❌ อยู่นอกพื้นที่!\n' +
+          '📍 สถานที่ที่เลือก: ' + selectedLocation.name + '\n' +
+          '📏 ระยะห่าง: ' + dist + ' ม. (ต้องอยู่ภายใน ' + GPS_RADIUS + ' ม.)\n' +
+          '💡 ถ้าอยู่ในอาคาร ลองออกไปที่โล่งแล้วลองใหม่',
+          'error'
+        );
       }
+
+      // เปิดปุ่มถ่ายรูปถ้า GPS ผ่าน
+      if(locOk && photoB64) document.getElementById('submitBtn').disabled = false;
       document.getElementById('gpsBtn').disabled = false;
     },
     function(err){
-      setStatus('❌ GPS Error: ' + err.message, 'error');
+      var msg = '';
+      if(err.code === 1) msg = 'ไม่อนุญาต GPS — ไปที่ Settings > LINE > Location > Allow';
+      else if(err.code === 2) msg = 'หา GPS ไม่เจอ — ลองออกไปที่โล่ง';
+      else if(err.code === 3) msg = 'GPS หมดเวลา — ลองใหม่';
+      else msg = err.message;
+      setStatus('❌ GPS Error: ' + msg, 'error');
       document.getElementById('gpsBtn').disabled = false;
     },
-    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
 }
 
@@ -313,7 +366,7 @@ function handlePhoto(input){
       photoB64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
       document.getElementById('photoPreview').src = canvas.toDataURL('image/jpeg', 0.75);
       document.getElementById('photoPreview').style.display = 'block';
-      if(locOk) document.getElementById('submitBtn').disabled = false;
+      if(locOk && photoB64) document.getElementById('submitBtn').disabled = false;
       debugData.photo = 'ok (' + photoB64.length + ' chars)';
     };
     img.src = e.target.result;
@@ -334,7 +387,8 @@ async function submitCheckin(){
     var result = await callAPI({
       action: 'saveCheckin',
       userId: userId,
-      photoBase64: photoB64
+      photoBase64: photoB64,
+      location: selectedLocationName
     });
     if(result.success){
       setBar(4, 'done');
