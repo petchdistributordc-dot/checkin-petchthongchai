@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ตั้งค่า เพชรธงชัย</title>
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#4a148c">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;background:#f3e5f5;display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:20px}
+.card{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.logo{text-align:center;margin-bottom:16px}
+.logo h1{color:#4a148c;font-size:20px}
+.logo p{color:#666;font-size:13px}
+#statusBox{padding:14px;border-radius:10px;font-size:14px;line-height:1.6;background:#f3e5f5;border:1px solid #ce93d8;color:#4a148c}
+#statusBox.error{background:#ffebee;border-color:#ef9a9a;color:#c62828}
+#statusBox.success{background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32}
+.section{margin-top:16px}
+label{font-size:14px;color:#555;display:block;margin-bottom:4px;font-weight:bold}
+.note{font-size:12px;color:#999;margin-top:2px}
+input{width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:15px;font-family:'Sarabun',sans-serif;margin-bottom:4px}
+input:focus{outline:none;border-color:#4a148c}
+input:disabled{background:#f5f5f5;color:#999}
+.btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:16px;font-family:'Sarabun',sans-serif;cursor:pointer;margin-top:10px;font-weight:bold}
+.btn-purple{background:#4a148c;color:#fff}
+.btn:disabled{background:#ccc;cursor:not-allowed}
+.info-box{background:#f3e5f5;padding:12px;border-radius:8px;font-size:13px;color:#666;line-height:1.8;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>⚙️ ตั้งค่าข้อมูลส่วนตัว</h1>
+    <p>บริษัท เพชรธงชัย เทรดดิ้ง จำกัด</p>
+  </div>
+  <div id="statusBox">⏳ กำลังโหลดข้อมูล...</div>
+
+  <div id="formSection" style="display:none">
+    <div class="section">
+      <label>ชื่อ-นามสกุล</label>
+      <input type="text" id="fName" placeholder="ชื่อ-นามสกุล">
+    </div>
+    <div class="section">
+      <label>แผนก <span style="color:#e53935">*แก้ไขได้โดย Admin เท่านั้น</span></label>
+      <input type="text" id="fDept" disabled>
+      <p class="note">ติดต่อผู้จัดการเพื่อแก้ไขแผนก</p>
+    </div>
+    <div class="section">
+      <label>ตำแหน่ง</label>
+      <input type="text" id="fPosition" placeholder="เช่น พนักงานขาย">
+    </div>
+    <div class="section">
+      <label>เบอร์โทรศัพท์</label>
+      <input type="tel" id="fPhone" placeholder="0812345678">
+    </div>
+
+    <button class="btn btn-purple" id="saveBtn" onclick="saveSettings()">💾 บันทึกการเปลี่ยนแปลง</button>
+
+    <div class="info-box">
+      ℹ️ สิ่งที่แก้ไขได้ด้วยตัวเอง:<br>
+      ✅ ชื่อ-นามสกุล (เช่น แก้ไขนามสกุล)<br>
+      ✅ ตำแหน่งงาน<br>
+      ✅ เบอร์โทรศัพท์<br>
+      ❌ แผนก (ต้องให้ Admin แก้ไข)
+    </div>
+  </div>
+</div>
+
+<script>
+var LIFF_ID = '2010044858-D1EyF8AC';
+var API_URL = 'https://script.google.com/macros/s/AKfycbzXFqoLRRhw6nPZtf2jv5dJngLsWDu91BlHxxbDJyFECnt7aM__armmZ7ODg-EeEn3ZGQ/exec';
+
+var userId = '';
+
+liff.init({ liffId: LIFF_ID })
+  .then(function() {
+    if (!liff.isLoggedIn()) { liff.login(); return Promise.reject('login'); }
+    userId = liff.getContext().userId;
+    return callAPI({ action: 'getEmployee', userId: userId });
+  })
+  .then(function(res) {
+    if (res.found) {
+      document.getElementById('fName').value     = res.name     || '';
+      document.getElementById('fDept').value     = res.dept     || '';
+      document.getElementById('fPosition').value = res.position || '';
+      document.getElementById('fPhone').value    = res.phone    || '';
+      setStatus('แก้ไขข้อมูลได้เลย แล้วกด "บันทึก"', '');
+      document.getElementById('formSection').style.display = 'block';
+    } else {
+      setStatus('❌ ไม่พบข้อมูลพนักงาน กรุณาลงทะเบียนก่อน', 'error');
+    }
+  })
+  .catch(function(err) { if (err !== 'login') setStatus('❌ '+err.message, 'error'); });
+
+function setStatus(msg, type) {
+  var el = document.getElementById('statusBox');
+  el.textContent = msg;
+  el.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+}
+
+async function saveSettings() {
+  var name     = document.getElementById('fName').value.trim();
+  var position = document.getElementById('fPosition').value.trim();
+  var phone    = document.getElementById('fPhone').value.trim();
+
+  if (!name) { alert('กรุณากรอกชื่อ-นามสกุล'); return; }
+
+  var btn = document.getElementById('saveBtn');
+  btn.disabled    = true;
+  btn.textContent = '⏳ กำลังบันทึก...';
+  setStatus('⏳ กำลังบันทึกข้อมูล...', '');
+
+  try {
+    var res = await callAPI({
+      action: 'selfUpdate', userId: userId,
+      name: name, position: position, phone: phone
+    });
+    if (res.success) {
+      setStatus('✅ บันทึกข้อมูลเรียบร้อยแล้ว!', 'success');
+      btn.textContent = '💾 บันทึกการเปลี่ยนแปลง';
+      btn.disabled = false;
+    } else {
+      setStatus('❌ '+(res.error||'เกิดข้อผิดพลาด'), 'error');
+      btn.textContent = '💾 บันทึกการเปลี่ยนแปลง';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    setStatus('❌ '+String(e), 'error');
+    btn.textContent = '💾 บันทึกการเปลี่ยนแปลง';
+    btn.disabled = false;
+  }
+}
+
+function callAPI(data) {
+  return fetch(API_URL, { method:'POST', body:JSON.stringify(data),
+    headers:{'Content-Type':'text/plain;charset=utf-8'}, redirect:'follow' })
+    .then(function(r){ return r.json(); });
+}
+</script>
+</body>
+</html>
