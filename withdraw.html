@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เบิกเงิน เพชรธงชัย</title>
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#1b5e20">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;background:#f1f8e9;min-height:100vh;padding:16px}
+.wrap{max-width:480px;margin:0 auto}
+.card{background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.logo{text-align:center;margin-bottom:12px}
+.logo h1{color:#1b5e20;font-size:20px}
+.logo p{color:#666;font-size:13px}
+/* Tabs */
+.tabs{display:flex;border-bottom:2px solid #e0e0e0;margin-bottom:16px}
+.tab{flex:1;padding:10px;text-align:center;font-size:15px;cursor:pointer;color:#888;font-family:'Sarabun',sans-serif;background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px}
+.tab.active{color:#1b5e20;border-bottom-color:#1b5e20;font-weight:bold}
+/* Status */
+#statusBox{padding:12px;border-radius:10px;font-size:14px;line-height:1.6;background:#f1f8e9;border:1px solid #a5d6a7;color:#1b5e20;margin-bottom:12px}
+#statusBox.error{background:#ffebee;border-color:#ef9a9a;color:#c62828}
+#statusBox.success{background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32}
+/* Form */
+.field{margin-bottom:14px}
+label{font-size:14px;color:#333;display:block;margin-bottom:5px;font-weight:bold}
+.sub-label{font-size:12px;color:#888;margin-bottom:5px}
+input[type=number],select,textarea{width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:15px;font-family:'Sarabun',sans-serif;outline:none}
+input:focus,select:focus,textarea:focus{border-color:#1b5e20}
+input:disabled,select:disabled{background:#f5f5f5;color:#888}
+textarea{resize:vertical;min-height:80px}
+.amount-box{background:#e8f5e9;padding:12px;border-radius:8px;font-size:14px;color:#1b5e20;margin-top:8px;display:none}
+.amount-box b{font-size:18px}
+.emp-box{background:#f9fbe7;padding:12px;border-radius:8px;font-size:14px;line-height:2;margin-bottom:16px}
+/* Buttons */
+.btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:16px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:bold;margin-top:4px}
+.btn-green{background:#2e7d32;color:#fff}
+.btn:disabled{background:#ccc;cursor:not-allowed}
+/* History */
+.hist-item{border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px}
+.hist-ref{font-size:12px;color:#888;margin-bottom:4px}
+.hist-amount{font-size:20px;font-weight:bold;color:#1b5e20}
+.hist-detail{font-size:13px;color:#555;margin-top:6px;line-height:1.8}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:bold;margin-top:6px}
+.badge-wait{background:#fff3e0;color:#e65100}
+.badge-ok{background:#e8f5e9;color:#2e7d32}
+.badge-no{background:#ffebee;color:#c62828}
+.no-hist{text-align:center;padding:30px;color:#aaa;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <div class="logo">
+      <h1>💰 เบิกเงินเพชรธงชัย</h1>
+      <p>บริษัท เพชรธงชัย เทรดดิ้ง จำกัด</p>
+    </div>
+    <div id="statusBox">⏳ กำลังโหลด...</div>
+
+    <div id="mainContent" style="display:none">
+      <!-- แถบ Tab -->
+      <div class="tabs">
+        <button class="tab active" id="tabForm" onclick="switchTab('form')">📝 ยื่นคำขอ</button>
+        <button class="tab"        id="tabHist" onclick="switchTab('hist')">📋 ประวัติ</button>
+      </div>
+
+      <!-- Tab: ฟอร์มเบิกเงิน -->
+      <div id="pageForm">
+        <div class="emp-box" id="empInfo"></div>
+
+        <div class="field">
+          <label>💵 จำนวนเงินที่ขอเบิก *</label>
+          <input type="number" id="fAmount" placeholder="เช่น 5000" min="1" oninput="calcInstall()">
+        </div>
+
+        <div class="field">
+          <label>📅 จำนวนงวดที่ต้องการหัก *</label>
+          <select id="fInstall" onchange="calcInstall()">
+            <option value="">-- เลือกจำนวนงวด --</option>
+            <option value="1">1 งวด (หักครั้งเดียว)</option>
+            <option value="2">2 งวด</option>
+            <option value="3">3 งวด</option>
+            <option value="4">4 งวด</option>
+            <option value="6">6 งวด</option>
+            <option value="10">10 งวด</option>
+            <option value="12">12 งวด</option>
+          </select>
+          <div class="amount-box" id="calcBox">
+            หักเงินเดือนงวดละ <b id="calcResult">0</b> บาท
+          </div>
+        </div>
+
+        <div class="field">
+          <label>📝 เหตุผล / รายละเอียด *</label>
+          <textarea id="fReason" placeholder="อธิบายเหตุผลที่ขอเบิกเงิน..."></textarea>
+        </div>
+
+        <button class="btn btn-green" id="submitBtn" onclick="submitWithdraw()">
+          📤 ส่งคำขอเบิกเงิน
+        </button>
+      </div>
+
+      <!-- Tab: ประวัติ -->
+      <div id="pageHist" style="display:none">
+        <div id="histList"><div class="no-hist">⏳ กำลังโหลด...</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var LIFF_ID = '2010044858-D1EyF8AC';
+var API_URL = 'https://script.google.com/macros/s/AKfycbzXFqoLRRhw6nPZtf2jv5dJngLsWDu91BlHxxbDJyFECnt7aM__armmZ7ODg-EeEn3ZGQ/exec';
+
+var userId = '', empData = null;
+
+// ── Init ──
+liff.init({ liffId: LIFF_ID })
+  .then(function() {
+    if (!liff.isLoggedIn()) { liff.login(); return Promise.reject('login'); }
+    userId = liff.getContext().userId;
+    return callAPI({ action: 'getEmployee', userId: userId });
+  })
+  .then(function(res) {
+    if (res.found) {
+      empData = res;
+      document.getElementById('empInfo').innerHTML =
+        '👤 <b>' + res.name + '</b>&nbsp;&nbsp;|&nbsp;&nbsp;🏢 ' + res.dept +
+        (res.position ? '&nbsp;&nbsp;|&nbsp;&nbsp;💼 ' + res.position : '');
+      setStatus('กรอกข้อมูลและกด "ส่งคำขอ"', '');
+      document.getElementById('mainContent').style.display = 'block';
+    } else {
+      setStatus('❌ ไม่พบข้อมูลพนักงาน กรุณาเช็คอินลงทะเบียนก่อน', 'error');
+    }
+  })
+  .catch(function(err) { if (err !== 'login') setStatus('❌ ' + (err.message||err), 'error'); });
+
+// ── Tab ──
+function switchTab(t) {
+  document.getElementById('tabForm').classList.toggle('active', t==='form');
+  document.getElementById('tabHist').classList.toggle('active', t==='hist');
+  document.getElementById('pageForm').style.display = t==='form' ? 'block' : 'none';
+  document.getElementById('pageHist').style.display = t==='hist' ? 'block' : 'none';
+  if (t === 'hist') loadHistory();
+}
+
+// ── คำนวณงวด ──
+function calcInstall() {
+  var amount  = Number(document.getElementById('fAmount').value);
+  var install = Number(document.getElementById('fInstall').value);
+  var box     = document.getElementById('calcBox');
+  if (amount > 0 && install > 0) {
+    var per = Math.ceil(amount / install);
+    document.getElementById('calcResult').textContent = per.toLocaleString();
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+// ── ส่งคำขอ ──
+async function submitWithdraw() {
+  var amount  = document.getElementById('fAmount').value;
+  var install = document.getElementById('fInstall').value;
+  var reason  = document.getElementById('fReason').value.trim();
+
+  if (!amount || Number(amount) <= 0) { alert('กรุณากรอกจำนวนเงิน'); return; }
+  if (!install) { alert('กรุณาเลือกจำนวนงวด'); return; }
+  if (!reason)  { alert('กรุณากรอกเหตุผล'); return; }
+
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '⏳ กำลังส่ง...';
+  setStatus('⏳ กำลังส่งคำขอ...', '');
+
+  try {
+    var res = await callAPI({
+      action:       'saveWithdraw',
+      userId:       userId,
+      amount:       Number(amount),
+      installments: Number(install),
+      reason:       reason
+    });
+    if (res.success) {
+      setStatus(
+        '✅ ส่งคำขอสำเร็จ!\n' +
+        '📋 เลขที่: ' + res.refNo + '\n' +
+        '💰 ' + res.amount.toLocaleString() + ' บาท | ' + res.installments + ' งวด | งวดละ ' + res.perMonth.toLocaleString() + ' บาท\n' +
+        '⏳ รอ Admin อนุมัติ',
+        'success'
+      );
+      document.getElementById('fAmount').value  = '';
+      document.getElementById('fInstall').value = '';
+      document.getElementById('fReason').value  = '';
+      document.getElementById('calcBox').style.display = 'none';
+    } else {
+      setStatus('❌ ' + (res.error||'เกิดข้อผิดพลาด'), 'error');
+    }
+  } catch(e) { setStatus('❌ ' + String(e), 'error'); }
+
+  btn.disabled = false; btn.textContent = '📤 ส่งคำขอเบิกเงิน';
+}
+
+// ── ประวัติ ──
+async function loadHistory() {
+  document.getElementById('histList').innerHTML = '<div class="no-hist">⏳ กำลังโหลด...</div>';
+  try {
+    var res = await callAPI({ action: 'getWithdrawHistory', userId: userId });
+    if (!res.history || res.history.length === 0) {
+      document.getElementById('histList').innerHTML = '<div class="no-hist">📭 ยังไม่มีประวัติการเบิกเงิน</div>';
+      return;
+    }
+    var html = '';
+    res.history.forEach(function(h) {
+      var badge = h.status === 'อนุมัติ'     ? '<span class="badge badge-ok">✅ อนุมัติแล้ว</span>'
+                : h.status === 'ไม่อนุมัติ'  ? '<span class="badge badge-no">❌ ไม่อนุมัติ</span>'
+                : '<span class="badge badge-wait">⏳ รอการอนุมัติ</span>';
+      html += '<div class="hist-item">' +
+        '<div class="hist-ref">' + h.refNo + ' &nbsp;|&nbsp; ' + h.date + '</div>' +
+        '<div class="hist-amount">' + Number(h.amount).toLocaleString() + ' บาท</div>' +
+        '<div class="hist-detail">' +
+          '📅 ' + h.installments + ' งวด | งวดละ ' + Number(h.perMonth).toLocaleString() + ' บาท<br>' +
+          '📝 ' + h.reason +
+          (h.adminNote ? '<br>💬 Admin: ' + h.adminNote : '') +
+        '</div>' + badge + '</div>';
+    });
+    document.getElementById('histList').innerHTML = html;
+  } catch(e) {
+    document.getElementById('histList').innerHTML = '<div class="no-hist">❌ โหลดไม่ได้: ' + e.message + '</div>';
+  }
+}
+
+function setStatus(msg, type) {
+  var el = document.getElementById('statusBox');
+  el.textContent = msg;
+  el.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+}
+function callAPI(data) {
+  return fetch(API_URL, { method:'POST', body:JSON.stringify(data),
+    headers:{'Content-Type':'text/plain;charset=utf-8'}, redirect:'follow' })
+    .then(function(r){ return r.json(); });
+}
+</script>
+</body>
+</html>
