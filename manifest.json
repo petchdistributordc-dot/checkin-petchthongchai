@@ -1,0 +1,20 @@
+{
+  "name": "เช็คอินเพชรธงชัย",
+  "short_name": "เช็คอิน",
+  "start_url": "/checkin-petchthongchai/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e53935",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/e53935/ffffff?text=DC",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/e53935/ffffff?text=DC",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
