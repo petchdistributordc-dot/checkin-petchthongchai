@@ -171,9 +171,31 @@ async function submitCheckout() {
   var btn = document.getElementById('submitBtn');
   btn.disabled    = true;
   btn.textContent = '⏳ กำลังบันทึก...';
-  setStatus('⏳ กำลังบันทึกเวลาออกงาน...', '');
+  setStatus('⏳ กำลังระบุตำแหน่ง...', '');
+
   try {
-    var res = await callAPI({ action: 'saveCheckout', userId: userId, photoBase64: photoB64 });
+    // ✅ ดึงพิกัด GPS ก่อนส่ง
+    var position = await new Promise(function(resolve, reject) {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    });
+
+    var lat = position.coords.latitude;
+    var lng = position.coords.longitude;
+
+    setStatus('⏳ กำลังบันทึกเวลาออกงาน...', '');
+
+    var res = await callAPI({ 
+      action: 'saveCheckout', 
+      userId: userId, 
+      photoBase64: photoB64,
+      lat: lat,   // ✅ ส่งพิกัดไปด้วย
+      lng: lng
+    });
+
     if (res.success) {
       document.getElementById('screenMain').style.display    = 'none';
       document.getElementById('screenSuccess').style.display = 'block';
@@ -187,10 +209,40 @@ async function submitCheckout() {
       btn.disabled    = false;
       btn.textContent = '🚪 บันทึกเช็คเอาท์';
     }
+
   } catch(e) {
-    setStatus('❌ ' + String(e), 'error');
-    btn.disabled    = false;
-    btn.textContent = '🚪 บันทึกเช็คเอาท์';
+    // ✅ ถ้าได้รับ GPS ไม่ได้ ยังบันทึกได้แต่ระยะจะเป็น '-'
+    if (e.code) {
+      setStatus('⚠️ ไม่สามารถระบุตำแหน่งได้ กำลังบันทึกโดยไม่มีพิกัด...', '');
+      try {
+        var res2 = await callAPI({ 
+          action: 'saveCheckout', 
+          userId: userId, 
+          photoBase64: photoB64
+        });
+        if (res2.success) {
+          document.getElementById('screenMain').style.display    = 'none';
+          document.getElementById('screenSuccess').style.display = 'block';
+          document.getElementById('successMsg').innerHTML =
+            'ชื่อ: <b>' + res2.name + '</b><br>' +
+            'แผนก: <b>' + res2.dept + '</b><br>' +
+            'เวลาออก: <b>' + res2.time + '</b>';
+          setStatus('', 'success');
+        } else {
+          setStatus('❌ ' + (res2.error || 'เกิดข้อผิดพลาด'), 'error');
+          btn.disabled    = false;
+          btn.textContent = '🚪 บันทึกเช็คเอาท์';
+        }
+      } catch(e2) {
+        setStatus('❌ ' + String(e2), 'error');
+        btn.disabled    = false;
+        btn.textContent = '🚪 บันทึกเช็คเอาท์';
+      }
+    } else {
+      setStatus('❌ ' + String(e), 'error');
+      btn.disabled    = false;
+      btn.textContent = '🚪 บันทึกเช็คเอาท์';
+    }
   }
 }
 
