@@ -22,7 +22,6 @@ label{font-size:14px;color:#333;display:block;margin-bottom:4px;font-weight:bold
 .btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:16px;font-family:'Sarabun',sans-serif;cursor:pointer;margin-top:10px;font-weight:bold}
 .btn-blue{background:#1565c0;color:#fff}
 .btn-gray{background:#9e9e9e;color:#fff}
-.btn-green{background:#2e7d32;color:#fff}
 .btn:disabled{background:#ccc;cursor:not-allowed}
 #cameraVideo{width:100%;border-radius:8px;background:#000;margin-top:6px;display:none}
 .photo-preview{width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-top:8px;display:none}
@@ -41,7 +40,7 @@ label{font-size:14px;color:#333;display:block;margin-bottom:4px;font-weight:bold
   <div id="screenMain" style="display:none">
     <div class="section">
       <div class="emp-box" id="empInfo"></div>
-      <div class="dist-box" id="distBox">📍 กำลังระบุตำแหน่ง...</div>
+      <div class="dist-box" id="distBox"></div>
     </div>
     <div class="section">
       <label>📷 ถ่ายรูปยืนยันการออกงาน *</label>
@@ -58,7 +57,6 @@ label{font-size:14px;color:#333;display:block;margin-bottom:4px;font-weight:bold
     <h2 style="color:#1565c0;margin-top:8px">เช็คเอาท์สำเร็จ!</h2>
     <p id="successMsg" style="margin-top:12px;color:#555;font-size:15px;line-height:2"></p>
     <div id="distResult" style="margin-top:10px;background:#fff8e1;border-radius:8px;padding:10px;font-size:14px;display:none"></div>
-    <!-- ✅ เปลี่ยนจาก liff.closeWindow() เป็นแค่แสดงข้อความ ไม่มี popup -->
     <div style="margin-top:20px;color:#888;font-size:13px">✅ บันทึกเสร็จแล้ว สามารถปิดหน้าต่างนี้ได้</div>
   </div>
 
@@ -66,8 +64,8 @@ label{font-size:14px;color:#333;display:block;margin-bottom:4px;font-weight:bold
 </div>
 
 <script>
-var LIFF_ID  = '2010044858-D1EyF8AC';
-var API_URL  = 'https://script.google.com/macros/s/AKfycbzXFqoLRRhw6nPZtf2jv5dJngLsWDu91BlHxxbDJyFECnt7aM__armmZ7ODg-EeEn3ZGQ/exec';
+var LIFF_ID = '2010044858-D1EyF8AC';
+var API_URL = 'https://script.google.com/macros/s/AKfycbzXFqoLRRhw6nPZtf2jv5dJngLsWDu91BlHxxbDJyFECnt7aM__armmZ7ODg-EeEn3ZGQ/exec';
 
 var userId = '', photoB64 = '', cameraStream = null;
 var userLat = null, userLng = null;
@@ -77,36 +75,43 @@ async function init() {
   setStatus('⏳ กำลังเชื่อมต่อ LINE...', '');
   try {
     if (typeof liff === 'undefined') throw new Error('LIFF SDK โหลดไม่ได้');
+
     await Promise.race([
       liff.init({ liffId: LIFF_ID }),
       new Promise(function(_, reject) {
-        setTimeout(function() { reject(new Error('เชื่อมต่อ LINE ไม่ได้ (Timeout)')); }, 10000);
+        setTimeout(function() {
+          reject(new Error('เชื่อมต่อ LINE ไม่ได้ (Timeout 10s)'));
+        }, 10000);
       })
     ]);
+
     if (!liff.isLoggedIn()) { liff.login(); return; }
+
     userId = liff.getContext().userId;
     setStatus('⏳ กำลังโหลดข้อมูลพนักงาน...', '');
+
     var res = await callAPI({ action: 'getEmployee', userId: userId });
+
     if (res.found) {
       document.getElementById('empInfo').innerHTML =
-        '<b>👤 ' + res.name + '</b><br>🏢 แผนก: ' + res.dept +
+        '<b>👤 ' + res.name + '</b><br>' +
+        '🏢 แผนก: ' + res.dept +
         (res.position ? '<br>💼 ตำแหน่ง: ' + res.position : '');
       setStatus('📷 ถ่ายรูปเพื่อบันทึกเวลาออกงาน', '');
       document.getElementById('screenMain').style.display = 'block';
-
-      // ✅ ดึง GPS ทันทีหลังโหลดข้อมูลพนักงาน แสดงระยะล่วงหน้า
       getLocation();
       startCamera();
     } else {
       setStatus('❌ ไม่พบข้อมูลพนักงาน\nกรุณาเช็คอินลงทะเบียนก่อน', 'error');
+      document.getElementById('retryBtn').style.display = 'block';
     }
+
   } catch(err) {
     setStatus('❌ ' + (err.message || String(err)), 'error');
     document.getElementById('retryBtn').style.display = 'block';
   }
 }
 
-// ✅ ฟังก์ชันดึง GPS แยกออกมา แสดงระยะก่อนกดบันทึก
 function getLocation() {
   var distBox = document.getElementById('distBox');
   distBox.style.display = 'block';
@@ -115,12 +120,13 @@ function getLocation() {
     function(pos) {
       userLat = pos.coords.latitude;
       userLng = pos.coords.longitude;
-      distBox.innerHTML = '📍 ตำแหน่งของคุณ<br>' +
-        '🌐 ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6);
+      distBox.innerHTML = '📍 ระบุตำแหน่งสำเร็จ<br>🌐 ' +
+        userLat.toFixed(6) + ', ' + userLng.toFixed(6);
     },
     function(err) {
-      distBox.innerHTML = '⚠️ ระบุตำแหน่งไม่ได้ — ระยะทางจะไม่แสดงใน Sheet<br><small>' + err.message + '</small>';
+      distBox.innerHTML = '⚠️ ระบุตำแหน่งไม่ได้ บันทึกได้แต่ไม่มีระยะ<br><small>' + err.message + '</small>';
       distBox.style.background = '#ffebee';
+      distBox.style.borderColor = '#ef9a9a';
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
@@ -132,4 +138,102 @@ function setStatus(msg, type) {
   el.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
 }
 
-function startCam
+function startCamera() {
+  if (cameraStream) cameraStream.getTracks().forEach(function(t) { t.stop(); });
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    .then(function(stream) {
+      cameraStream = stream;
+      var vid = document.getElementById('cameraVideo');
+      vid.srcObject = stream;
+      vid.style.display = 'block';
+      document.getElementById('captureBtn').style.display = 'block';
+    })
+    .catch(function(err) {
+      setStatus('❌ เปิดกล้องไม่ได้: ' + err.message + '\nกรุณาอนุญาตการเข้าถึงกล้อง', 'error');
+    });
+}
+
+function capturePhoto() {
+  var video  = document.getElementById('cameraVideo');
+  var canvas = document.createElement('canvas');
+  var scale  = Math.min(800 / video.videoWidth, 800 / video.videoHeight, 1);
+  canvas.width  = video.videoWidth  * scale;
+  canvas.height = video.videoHeight * scale;
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  if (cameraStream) cameraStream.getTracks().forEach(function(t) { t.stop(); });
+  var dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+  photoB64    = dataUrl.split(',')[1];
+  document.getElementById('cameraVideo').style.display  = 'none';
+  document.getElementById('captureBtn').style.display   = 'none';
+  document.getElementById('photoPreview').src           = dataUrl;
+  document.getElementById('photoPreview').style.display = 'block';
+  document.getElementById('retakeBtn').style.display    = 'block';
+  document.getElementById('submitBtn').disabled         = false;
+}
+
+function retakePhoto() {
+  photoB64 = '';
+  document.getElementById('submitBtn').disabled         = true;
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('retakeBtn').style.display    = 'none';
+  startCamera();
+}
+
+async function submitCheckout() {
+  if (!photoB64) { alert('กรุณาถ่ายรูปก่อน'); return; }
+  var btn = document.getElementById('submitBtn');
+  btn.disabled    = true;
+  btn.textContent = '⏳ กำลังบันทึก...';
+  setStatus('⏳ กำลังบันทึกเวลาออกงาน...', '');
+
+  try {
+    var payload = {
+      action: 'saveCheckout',
+      userId: userId,
+      photoBase64: photoB64
+    };
+    if (userLat !== null && userLng !== null) {
+      payload.lat = userLat;
+      payload.lng = userLng;
+    }
+
+    var res = await callAPI(payload);
+
+    if (res.success) {
+      document.getElementById('screenMain').style.display    = 'none';
+      document.getElementById('screenSuccess').style.display = 'block';
+      document.getElementById('successMsg').innerHTML =
+        'ชื่อ: <b>' + res.name + '</b><br>' +
+        'แผนก: <b>' + res.dept + '</b><br>' +
+        'เวลาออก: <b>' + res.time + '</b>';
+      if (res.distance !== undefined && res.distance !== '-') {
+        var dr = document.getElementById('distResult');
+        dr.style.display = 'block';
+        dr.innerHTML = '📍 ระยะห่างจากสำนักงาน: <b>' + res.distance + ' เมตร</b>';
+      }
+      setStatus('✅ บันทึกสำเร็จ', 'success');
+    } else {
+      setStatus('❌ ' + (res.error || 'เกิดข้อผิดพลาด'), 'error');
+      btn.disabled    = false;
+      btn.textContent = '🚪 บันทึกเช็คเอาท์';
+    }
+  } catch(e) {
+    setStatus('❌ ' + String(e), 'error');
+    btn.disabled    = false;
+    btn.textContent = '🚪 บันทึกเช็คเอาท์';
+  }
+}
+
+function callAPI(data) {
+  return fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    redirect: 'follow'
+  }).then(function(r) { return r.json(); });
+}
+
+init();
+</script>
+</body>
+</html>
