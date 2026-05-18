@@ -302,12 +302,92 @@ function checkGPS(){
   setStatus('⏳ กำลังหาตำแหน่ง GPS...', 'loading');
   setBar(3, 'active');
   document.getElementById('gpsBtn').disabled = true;
+  document.getElementById('gpsBtn').textContent = '⏳ กำลังหา GPS...';
 
   if(!navigator.geolocation){
     setStatus('❌ เครื่องนี้ไม่รองรับ GPS', 'error');
-    document.getElementById('gpsBtn').disabled = false;
-    return;
+    resetGpsBtn(); return;
   }
+
+  var done = false; // ป้องกัน callback ถูกเรียกซ้ำ
+
+  // Safety net: ถ้า 18 วินาทีแล้วไม่มี callback ใดเลย
+  var safetyTimer = setTimeout(function(){
+    if(done) return;
+    done = true;
+    setStatus(
+      '❌ GPS ค้างนานเกินไป ลองทำตามนี้:\n' +
+      '1. ปิด-เปิด Location ในการตั้งค่าโทรศัพท์\n' +
+      '2. ออกไปที่โล่งแล้วลองใหม่\n' +
+      '3. รีสตาร์ท LINE แล้วลองอีกครั้ง',
+      'error'
+    );
+    resetGpsBtn();
+  }, 18000);
+
+  function onSuccess(pos){
+    if(done) return;
+    done = true;
+    clearTimeout(safetyTimer);
+
+    var lat  = pos.coords.latitude;
+    var lng  = pos.coords.longitude;
+    var acc  = Math.round(pos.coords.accuracy);
+    var dist = Math.round(haversine(lat, lng, selectedLocation.lat, selectedLocation.lng));
+
+    currentLat = lat;
+    currentLng = lng;
+    debugData.gps = { lat:lat, lng:lng, accuracy:acc, distToTarget:dist };
+    setBar(3, 'done');
+
+    if(dist <= GPS_RADIUS){
+      locOk = true;
+      setStatus(
+        '✅ GPS ผ่าน!\n📍 '+selectedLocation.name+
+        '\n📏 ระยะห่าง: '+dist+' ม. (ความแม่นยำ ±'+acc+' ม.)',
+        'success'
+      );
+    } else {
+      locOk = false;
+      setStatus(
+        '❌ อยู่นอกพื้นที่!\n📍 '+selectedLocation.name+
+        '\n📏 ระยะห่าง: '+dist+' ม. (ต้องอยู่ภายใน '+GPS_RADIUS+' ม.)'+
+        '\n💡 ถ้าอยู่ในอาคาร ลองออกไปที่โล่งแล้วลองใหม่',
+        'error'
+      );
+    }
+    if(locOk && photoB64) document.getElementById('submitBtn').disabled = false;
+    resetGpsBtn();
+  }
+
+  function onError(err){
+    if(done) return;
+    done = true;
+    clearTimeout(safetyTimer);
+    var msg = err.code===1 ? 'ไม่อนุญาต GPS\nไปที่ Settings → LINE → Location → Allow'
+            : err.code===2 ? 'หา GPS ไม่เจอ ลองออกไปที่โล่ง'
+            : err.code===3 ? 'GPS หมดเวลา ลองกดใหม่อีกครั้ง'
+            : err.message;
+    setStatus('❌ GPS Error: '+msg, 'error');
+    resetGpsBtn();
+  }
+
+  // ลองด้วย high accuracy ก่อน 12 วินาที
+  navigator.geolocation.getCurrentPosition(onSuccess, function(err){
+    if(done) return;
+    // ถ้า high accuracy ล้มเหลว → ลอง low accuracy ทันที
+    setStatus('⏳ กำลังหาตำแหน่ง (โหมดสำรอง)...', 'loading');
+    navigator.geolocation.getCurrentPosition(onSuccess, onError,
+      { enableHighAccuracy:false, timeout:8000, maximumAge:30000 }
+    );
+  }, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+}
+
+function resetGpsBtn(){
+  var btn = document.getElementById('gpsBtn');
+  btn.disabled = false;
+  btn.textContent = '📍 ตรวจสอบตำแหน่ง GPS';
+}
 
   navigator.geolocation.getCurrentPosition(
     function(pos){
