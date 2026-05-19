@@ -141,7 +141,6 @@ var LOCATIONS = [
   { name: 'สำนักงานใหญ่ / คลังสินค้า', lat: 13.7368098, lng: 100.8028095 },
   { name: 'มินิออฟฟิศ ลาดพร้าว 114',   lat: 13.7740358,  lng: 100.6205187 }
 ];
-var GPS_RADIUS = 50;
 // ===================
 
 var userId = '', userName = '', locOk = false, photoB64 = '';
@@ -319,7 +318,7 @@ function resetGpsBtn() {
   btn.textContent = '📍 ตรวจสอบตำแหน่ง GPS';
 }
 
-// ── ตรวจสอบ GPS (พร้อม safety timeout + fallback) ──
+// ── ตรวจสอบ GPS (บันทึกระยะโดยไม่บล็อกเช็คอิน) ──
 function checkGPS() {
   if (!selectedLocation) { alert('กรุณาเลือกสถานที่ก่อน'); return; }
   setStatus('⏳ กำลังหาตำแหน่ง GPS...', 'loading');
@@ -362,22 +361,14 @@ function checkGPS() {
     debugData.gps = { lat: lat, lng: lng, accuracy: acc, distToTarget: dist };
     setBar(3, 'done');
 
-    if (dist <= GPS_RADIUS) {
-      locOk = true;
-      setStatus(
-        '✅ GPS ผ่าน!\n📍 ' + selectedLocation.name +
-        '\n📏 ระยะห่าง: ' + dist + ' ม. (ความแม่นยำ ±' + acc + ' ม.)',
-        'success'
-      );
-    } else {
-      locOk = false;
-      setStatus(
-        '❌ อยู่นอกพื้นที่!\n📍 ' + selectedLocation.name +
-        '\n📏 ระยะห่าง: ' + dist + ' ม. (ต้องอยู่ภายใน ' + GPS_RADIUS + ' ม.)' +
-        '\n💡 ถ้าอยู่ในอาคาร ลองออกไปที่โล่งแล้วลองใหม่',
-        'error'
-      );
-    }
+    // ✅ บันทึก GPS สำเร็จเสมอ ไม่จำกัดระยะ
+    locOk = true;
+    setStatus(
+      '✅ GPS บันทึกแล้ว!\n📍 ' + selectedLocation.name +
+      '\n📏 ระยะห่าง: ' + dist + ' ม. (ความแม่นยำ ±' + acc + ' ม.)',
+      'success'
+    );
+
     if (locOk && photoB64) document.getElementById('submitBtn').disabled = false;
     resetGpsBtn();
   }
